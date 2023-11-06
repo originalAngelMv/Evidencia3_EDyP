@@ -501,9 +501,571 @@ while True:
             else:
                 print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
     elif menu_principal == "2":
-        pass
+        while True:
+            print("""
+            ╔════════════════════════════╗
+            ║         CLIENTES           ║
+            ╠════════════════════════════╣
+            ║ 1. Agregar un cliente.     ║
+            ║ 2. Consultas y reportes.   ║
+            ║ 3. Volver al menú principal║
+            ╚════════════════════════════╝
+            """)
+            menu_clientes = input("Ingrese una opción del menú de clientes: ")
+            
+            if menu_clientes == "1":
+                try:
+                    with sqlite3.connect('notas.db') as conn:
+                        mi_cursor = conn.cursor()
+                        while True:
+                            nombre_cliente = input("\nNombre del cliente([S] para salir): ").strip().upper()
+    
+                            if nombre_cliente == "":
+                                print("EL DATO NO PUEDE OMITIRSE. INTENTE DENUEVO.")
+                            elif any(char.isdigit() for char in nombre_cliente):
+                                print("EL NOMBRE NO PUEDE CONTENER DÍGITOS. INTENTE NUEVAMENTE.")
+                            elif nombre_cliente.lower() == "s":
+                                break
+                            else:
+                                while True:
+                                    RFC_cliente = input("\nIngrese un RFC (por ejemplo: Persona física: XEXT990101NI4 /Persona moral: EXT990101NI4 ): ").strip().upper()
+                                    
+                                    if not RFC_cliente:
+                                        print("EL DATO NO PUEDE OMITIRSE. INTENTE DENUEVO.")
+                                    elif not re.match(r'^[A-Z]{3,4}[0-9]{6}[A-Z0-9]{3}$', RFC_cliente):
+                                        print("EL RFC INGRESADO NO TIENE EL FORMATO CORRECTO. INTENTE NUEVAMENTE.")
+                                    else:
+                                        try:
+                                            if len(RFC_cliente) == 13:
+                                                fecha_rfc = datetime.datetime.strptime(RFC_cliente[4:10], '%y%m%d')
+                                            elif len(RFC_cliente) == 12:
+                                                fecha_rfc = datetime.datetime.strptime(RFC_cliente[3:9], '%y%m%d')
+                                        except ValueError:
+                                            print("LA FECHA EN EL RFC NO ES VÁLIDA. INTENTE NUEVAMENTE.")
+                                            continue
+                                        break
+                                while True:
+                                    correo_cliente = input("\nIngrese su correo electrónico : ").strip()
+
+                                    if not correo_cliente:
+                                        print("EL DATO NO PUEDE OMITIRSE. INTENTE DENUEVO.")
+                                    elif not re.match(r'^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', correo_cliente):
+                                        print("EL CORREO ELECTRÓNICO TIENE UN FORMATO INCORRECTO/NO EXISTE. INTENTE NUEVAMENTE")  
+                                    else:
+                                        break
+                            valores = (nombre_cliente,RFC_cliente,correo_cliente)
+                            mi_cursor.execute("INSERT INTO clientes (nombre_cliente,RFC_cliente,correo_cliente) VALUES(?,?,?)",valores)
+                            print("Todo salio bien.")
+                            break                
+                except sqlite3.Error as e:
+                    print(e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                finally:
+                    if (conn):
+                        conn.close()
+            elif menu_clientes == "2":
+                while True:
+                    print("""
+                    ╔════════════════════════════════════╗
+                    ║        CONSULTAS Y REPORTES        ║
+                    ╟────────────────────────────────────╢
+                    ║ 1. Listado de clientes registrados.║
+                    ║ 2. Búsqueda por clave.             ║
+                    ║ 3. Búsqueda por nombre.            ║ 
+                    ║ 4. Volver al menú de clientes.     ║
+                    ╚════════════════════════════════════╝
+                    """)
+                    menu_consulta_cliente = input("Ingrese una opción del menú de consulta: ")
+                    if menu_consulta_cliente == "1":
+                        while True:
+                            print("\nMenú de Listado de clientes registrados.\n1. Ordenado por clave.\n2. Ordenado por nombre.\n3. Volver al menú anterior.")
+                            listado_cliente = input("\nIngrese una opción de listado: ")
+                            
+                            if listado_cliente == "1":
+                                try:
+                                    with sqlite3.connect('notas.db') as conn:
+                                        mi_cursor = conn.cursor()
+                                        
+                                        mi_cursor.execute("SELECT * FROM clientes ORDER BY id_cliente")
+
+                                        todos_los_clientes = mi_cursor.fetchall()
+
+                                        if not todos_los_clientes:
+                                            print("No hay clientes registrados para mostrar.")
+                                            break
+                                        else:
+                                            print("Reporte de todos los clientes ordenados por clave:")
+                                            print(f"\n{'Clave':<10}| {'Nombre':<21}| {'RFC':<18}| {'Correo':<30}|")
+                                            print("-"*80)
+                                            for clave,nombre,RFC,correo in todos_los_clientes:
+                                                clave = str(clave)
+                                                clave = clave.ljust(10)
+                                                nombre =nombre.ljust(20)
+                                                correo = correo.ljust(30)
+                                                print(f"{clave:<10}| {nombre:<20}| {RFC:<18}| {correo:<30}|")
+                                                print("-"*80)
+                                            while True:
+                                                print("MENÚ\n[C]SV\n[E]xcel\n[R]egresar")
+                                                opcion = input("¿Desea exportar el reporte? (CSV/Excel/Regresar): ").strip().lower()
+                                                
+                                                fecha_actual = datetime.datetime.now().strftime("%m_%d_%Y")
+                
+                                                if opcion == "c":
+                                                    
+                                                    nombre_archivo = f"ReporteClientesActivosPorClave_{fecha_actual}.csv"
+                                                    try:
+                                                        with open(nombre_archivo, 'w', newline='') as archivo_csv:
+                                                            escritor = csv.writer(archivo_csv)
+                                                            escritor.writerow(["Clave", "Nombre", "RFC", "Correo"])
+                                                            for clave,nombre,RFC,correo in todos_los_clientes:
+                                                                escritor.writerow([clave,nombre,RFC,correo])
+                                                        print(f'Se han guardado los datos en {nombre_archivo}')
+                                                    except Exception as e:
+                                                        print(f'Error al guardar los datos en el archivo CSV: {e}')
+                                                    break
+                                                elif opcion == "e":
+                                                    nombre_archivo = f"ReporteClientesActivosPorClave_{fecha_actual}.xlsx"
+                                                    libro = openpyxl.Workbook()
+                                                    hoja = libro.active
+                                                    hoja.title = "Clientes"
+
+                                                    hoja.append(["Clave", "Nombre", "RFC", "Correo"])
+
+                                                    for cliente in todos_los_clientes:
+                                                        hoja.append(cliente)
+                                                    hoja.column_dimensions["A"].width = 10  
+                                                    hoja.column_dimensions["B"].width = 30  
+                                                    hoja.column_dimensions["C"].width = 20  
+                                                    hoja.column_dimensions["D"].width = 30  
+
+                                                    libro.save(nombre_archivo)
+
+                                                    print(f"Reporte exportado a {nombre_archivo}")
+                                                    break
+                                                elif opcion == "r":
+                                                    break
+                                                else:
+                                                    print("Opción no válida. Ingrese 'CSV', 'Excel' o 'Regresar'.")
+                                        break       
+                                except sqlite3.Error as e:
+                                    print(e)
+                                except Exception as ex:
+                                    print(f"Se produjo el siguiente error: {ex}")
+                            elif listado_cliente == "2":
+                                try:
+                                    with sqlite3.connect('notas.db') as conn:
+                                        mi_cursor = conn.cursor()
+                                        
+                                        mi_cursor.execute("SELECT * FROM clientes ORDER BY nombre_cliente")
+
+                                        todos_los_clientes_nombre = mi_cursor.fetchall()
+
+                                        if not todos_los_clientes_nombre:
+                                            print("No hay clientes registrados para mostrar.")
+                                            break
+                                        else:
+                                            print("Reporte de todos los clientes ordenados por nombre:")
+                                            print(f"\n{'Clave':<10}| {'Nombre':<21}| {'RFC':<18}| {'Correo':<30}|")
+                                            print("-"*80)
+                                            for clave,nombre,RFC,correo in todos_los_clientes_nombre:
+                                                clave = str(clave)
+                                                clave = clave.ljust(10)
+                                                nombre =nombre.ljust(20)
+                                                correo = correo.ljust(30)
+                                                print(f"{clave:<10}| {nombre:<20}| {RFC:<18}| {correo:<30}|")
+                                                print("-"*80)
+                                            while True:
+                                                print("MENÚ\n[C]SV\n[E]xcel\n[R]egresar")
+                                                opcion = input("¿Desea exportar el reporte? (CSV/Excel/Regresar): ").strip().lower()
+                                                
+                                                fecha_actual = datetime.datetime.now().strftime("%m_%d_%Y")
+                
+                                                if opcion == "c":
+                                                    
+                                                    nombre_archivo = f"ReporteClientesActivosPorNombre_{fecha_actual}.csv"
+                                                    try:
+                                                        with open(nombre_archivo, 'w', newline='') as archivo_csv:
+                                                            escritor = csv.writer(archivo_csv)
+                                                            escritor.writerow(["Clave", "Nombre", "RFC", "Correo"])
+                                                            for clave,nombre,RFC,correo in todos_los_clientes_nombre:
+                                                                escritor.writerow([clave,nombre,RFC,correo])
+                                                        print(f'Se han guardado los datos en {nombre_archivo}')
+                                                    except Exception as e:
+                                                        print(f'Error al guardar los datos en el archivo CSV: {e}')
+                                                    break
+                                                elif opcion == "e":
+                                                    nombre_archivo = f"ReporteClientesActivosPorNombre_{fecha_actual}.xlsx"
+                                                    libro = openpyxl.Workbook()
+                                                    hoja = libro.active
+                                                    hoja.title = "Clientes"
+
+                                                    hoja.append(["Clave", "Nombre", "RFC", "Correo"])
+
+                                                    for cliente in todos_los_clientes_nombre:
+                                                        hoja.append(cliente)
+                                                    hoja.column_dimensions["A"].width = 10  
+                                                    hoja.column_dimensions["B"].width = 30  
+                                                    hoja.column_dimensions["C"].width = 20  
+                                                    hoja.column_dimensions["D"].width = 30  
+
+                                                    libro.save(nombre_archivo)
+
+                                                    print(f"Reporte exportado a {nombre_archivo}")
+                                                    break
+                                                elif opcion == "r":
+                                                    break
+                                                else:
+                                                    print("Opción no válida. Ingrese 'CSV', 'Excel' o 'Regresar'.")
+                                        break       
+                                except sqlite3.Error as e:
+                                    print(e)
+                                except Exception as ex:
+                                    print(f"Se produjo el siguiente error: {ex}")
+                            elif listado_cliente == "3":
+                                print("Fuera del menú de listado de clientes registrados.")
+                                break
+                            else:
+                                print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
+                    elif menu_consulta_cliente == "2":
+                        try:
+                            with sqlite3.connect('notas.db') as conn:
+                                mi_cursor = conn.cursor()
+                                
+                                clave_buscar = input("Ingrese la clave del cliente que desea buscar: ").strip()
+                                
+                                mi_cursor.execute("SELECT * FROM clientes WHERE id_cliente = ?", (clave_buscar,))
+                                cliente_encontrado = mi_cursor.fetchone()
+
+                                if cliente_encontrado:
+                                    print("\nCliente encontrado:")
+                                    clave, nombre, RFC, correo = cliente_encontrado
+                                    print(f"Clave: {clave}")
+                                    print(f"Nombre: {nombre}")
+                                    print(f"RFC: {RFC}")
+                                    print(f"Correo: {correo}\n")
+                                    break
+                                else:
+                                    print("No se encontró un cliente con esa clave.")
+                        except sqlite3.Error as e:
+                            print(e)
+                        except Exception as ex:
+                            print(f"Se produjo el siguiente error: {ex}")
+                    elif menu_consulta_cliente == "3":
+                        try:
+                            with sqlite3.connect('notas.db') as conn:
+                                mi_cursor = conn.cursor()
+                                
+                                nombre_a_buscar = input("Ingrese el nombre del cliente que desea buscar: ").strip()
+                                
+                                mi_cursor.execute("SELECT * FROM clientes WHERE nombre_cliente = ?", (nombre_a_buscar,))
+                                cliente_encontrado = mi_cursor.fetchone()
+
+                                if cliente_encontrado:
+                                    print("\nCliente encontrado:")
+                                    clave, nombre, RFC, correo = cliente_encontrado
+                                    print(f"Clave: {clave}")
+                                    print(f"Nombre: {nombre}")
+                                    print(f"RFC: {RFC}")
+                                    print(f"Correo: {correo}\n")
+                                    break
+                                else:
+                                    print("No se encontró un cliente con ese nombre.")
+                                    break
+                        except sqlite3.Error as e:
+                            print(e)
+                        except Exception as ex:
+                            print(f"Se produjo el siguiente error: {ex}")
+                    elif menu_consulta_cliente == "4":
+                        print("Fuera del menú de consultas y reportes.")
+                        break    
+                    else:
+                        print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")   
+            elif menu_clientes == "3":
+                print("Fuera del menú de clientes.")
+                break
+            else:
+                print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
+
     elif menu_principal == "3":
-        pass
+       while True:
+            print("""
+            ╔════════════════════════════╗
+            ║         SERVICIOS          ║
+            ╠════════════════════════════╣
+            ║ 1. Agregar un servicio.    ║
+            ║ 2. Consultas y reportes.   ║
+            ║ 3. Volver al menú principal║
+            ╚════════════════════════════╝
+            """)
+            menu_servicios = input("Ingrese una opción del menú de servicios: ")
+            
+            if menu_servicios == "1":
+                try:
+                    with sqlite3.connect('notas.db') as conn:
+                        mi_cursor = conn.cursor() 
+                        while True:
+                            nombre_servicio = input("\nNombre del servicio/ ([S] para salir): ").strip().upper()
+                            if nombre_servicio == "":
+                                print("EL DATO NO PUEDE OMITIRSE. INTENTE DENUEVO.")
+                                continue
+                            if nombre_servicio == "S":
+                                break
+
+                            while True:
+                                
+                                costo_servicio = input("\nCosto del servicio: ").strip()
+                                if costo_servicio == "":
+                                    print("EL DATO NO PUEDE OMITIRSE. INTENTE DENUEVO.")
+                                    continue
+                                
+                                try:
+                                    costo_servicio = float(costo_servicio)
+                                    if costo_servicio <= 0:
+                                        print("EL COSTO DEBE SER MAYOR A 0 PESOS. INTENTE DENUEVO")
+                                        continue
+                                    else:
+                                        valores_servicios = (nombre_servicio,costo_servicio)
+                                        mi_cursor.execute("INSERT INTO servicios (nombre_servicio,costo_servicio) VALUES(?,?)",valores_servicios)
+                                        print("Todo salio bien.")
+                                        break
+                                except ValueError:
+                                    print("SE INGRESÓ UN CARÁCTER NO NUMÉRICO. INTENTE DENUEVO ")  
+                            break
+                                  
+                except sqlite3.Error as e:
+                    print(e)
+                except:
+                    print(f"Se produjo el siguiente error: {sys.exc_info()[0]}")
+                finally:
+                    if (conn):
+                        conn.close()
+            elif menu_servicios == "2":
+                while True:
+                    print("""
+                    ╔════════════════════════════════════╗
+                    ║        CONSULTAS Y REPORTES        ║
+                    ╟────────────────────────────────────╢
+                    ║ 1. Búqueda por clave de servicio.  ║
+                    ║ 2. Búsqueda por nombre de servicio.║
+                    ║ 3. Listado de servivios.           ║ 
+                    ║ 4. Volver al menú de servicios.    ║
+                    ╚════════════════════════════════════╝
+                    """)
+                    menu_consulta_servivio = input("Ingrese una opción del menú de consultas y reportes: ")
+                    
+                    if menu_consulta_servivio == "1":
+                        try:
+                            with sqlite3.connect('notas.db') as conn:
+                                mi_cursor = conn.cursor()
+                                
+                                mi_cursor.execute("SELECT*FROM servicios")
+                                servicios_disponibles = mi_cursor.fetchall()
+
+                                if servicios_disponibles is None:
+                                    print("No hay servicios disponibles para mostrar.")
+                                else:
+                                    print("Listado de servicios disponibles:")
+                                    print(f"\n{'Clave':<10}| {'Nombre de Servicio':<30}|")
+                                    print("-"*45)
+                                    for clave, nombre_servicio,costo_servicio in servicios_disponibles:
+                                        print(f"{clave:<10}| {nombre_servicio:<30}|")
+                                    print("-"*45)
+                                    
+                                    clave_servicio = input("Ingrese la clave del servicio que desea buscar: ").strip()
+                                    
+                                    
+                                    mi_cursor.execute("SELECT * FROM servicios WHERE id_servicio = ?", (clave_servicio,))
+                                    servicio_encontrado = mi_cursor.fetchone()
+
+                                    if servicio_encontrado:
+                                        print("\nDetalle del servicio:")
+                                        clave, nombre, costo = servicio_encontrado
+                                        print(f"Clave de Servicio: {clave}")
+                                        print(f"Nombre de Servicio: {nombre}")
+                                        print(f"Costo de Servicio: {costo:.2f}")
+                                    else:
+                                        print("No se encontró un servicio con esa clave.")
+                        except sqlite3.Error as e:
+                            print(e)
+                        except Exception as ex:
+                            print(f"Se produjo el siguiente error: {ex}")
+                    elif menu_consulta_servivio == "2":
+                        try:
+                            with sqlite3.connect('notas.db') as conn:
+                                    mi_cursor = conn.cursor()
+                                    
+                                    nombre_buscar = input("Ingrese el nombre del servicio a buscar: ").upper()
+                                    
+                                    mi_cursor.execute("SELECT * FROM servicios WHERE nombre_servicio = ?", (nombre_buscar,))
+                                    servicio_encontrado = mi_cursor.fetchone()
+
+                                    if not servicio_encontrado:
+                                        print("No se encontró un servicio con ese nombre.")
+                                        break
+                                    else:
+                                        print("\nDetalle del servicio encontrado:\n")
+                                        clave, nombre, costo = servicio_encontrado
+                                        print(f"Clave de Servicio: {clave}")
+                                        print(f"Nombre de Servicio: {nombre}")
+                                        print(f"Costo de Servicio: {costo:.2f}")
+                                        break
+                        except sqlite3.Error as e:
+                            print(e)
+                        except Exception as ex:
+                            print(f"Se produjo el siguiente error: {ex}")
+                    elif menu_consulta_servivio == "3":
+                        while True:
+                            print("\nMenú de Listado de servicios.\n1. Ordenado por clave.\n2. Ordenado por nombre de servicio.\n3. Volver al menú anterior.")
+                            listado_servicio = input("\nIngrese una opción del listado de servivios: ")
+                            
+                            if listado_servicio == "1":
+                                try:
+                                    with sqlite3.connect('notas.db') as conn:
+                                        mi_cursor = conn.cursor()
+                                        mi_cursor.execute("SELECT * FROM servicios ORDER BY id_servicio")
+                                        todos_los_servicios_por_clave = mi_cursor.fetchall()
+
+                                        if not todos_los_servicios_por_clave:
+                                            print("\nNo hay servicios registrados para mostrar.\n")
+                                        else:
+                                            fecha_actual = datetime.datetime.now().strftime("%m_%d_%Y")
+                                            print("Reporte de todos los servicios ordenados por clave:\n")
+                                            print(f"\n{'Clave':<10}| {'Nombre':<30}| {'Costo':<15}|")
+                                            print("-"*60)
+
+                                            for clave, nombre, costo in todos_los_servicios_por_clave:
+                                                clave = str(clave)
+                                                clave = clave.ljust(10)
+                                                nombre = nombre.ljust(30)
+                                                costo = f'{costo:.2f}'.ljust(15)
+                                                print(f"{clave:<10}| {nombre:<30}| {costo:<15}|")
+
+                                            while True:
+                                                print("MENÚ\n[C]SV\n[E]xcel\n[R]egresar")
+                                                opcion = input("¿Desea exportar el reporte? (CSV/Excel/Regresar): ").strip().lower()
+
+                                                if opcion == "c":
+                                                    nombre_archivo = f"ReporteServiciosPorClave_{fecha_actual}.csv"
+                                                    try:
+                                                        with open(nombre_archivo, 'w', newline='') as archivo_csv:
+                                                            escritor = csv.writer(archivo_csv)
+                                                            escritor.writerow(["Clave", "Nombre", "Costo"])
+                                                            for clave, nombre, costo in todos_los_servicios_por_clave:
+                                                                escritor.writerow([clave, nombre, costo])
+                                                        print(f'\nSe han guardado los datos en {nombre_archivo}\n')
+                                                    except Exception as e:
+                                                        print(f'Error al guardar los datos en el archivo CSV: {e}')
+                                                    break
+                                                elif opcion == "e":
+                                                    nombre_archivo = f"ReporteServiciosPorClave_{fecha_actual}.xlsx"
+                                                    libro = openpyxl.Workbook()
+                                                    hoja = libro.active
+                                                    hoja.title = "Servicios"
+
+                                                    hoja.append(["Clave", "Nombre", "Costo"])
+
+                                                    for clave, nombre, costo in todos_los_servicios_por_clave:
+                                                        hoja.append([clave, nombre, costo])
+                                                    hoja.column_dimensions["A"].width = 10
+                                                    hoja.column_dimensions["B"].width = 40
+                                                    hoja.column_dimensions["C"].width = 20
+
+                                                    libro.save(nombre_archivo)
+
+                                                    print(f"\nReporte exportado a {nombre_archivo}\n")
+                                                    break
+                                                elif opcion == "r":
+                                                    break
+                                                else:
+                                                    print("Opción no válida. Ingrese 'CSV', 'Excel' o 'Regresar.'")
+
+                                except sqlite3.Error as e:
+                                    print(e)
+                                except Exception as ex:
+                                    print(f"Se produjo el siguiente error: {ex}")
+
+                            elif listado_servicio == "2":
+                                try:
+                                    with sqlite3.connect('notas.db') as conn:
+                                        mi_cursor = conn.cursor()
+                                        mi_cursor.execute("SELECT * FROM servicios ORDER BY nombre_servicio")
+                                        todos_los_servicios_por_nombre = mi_cursor.fetchall()
+
+                                        if not todos_los_servicios_por_nombre:
+                                            print("No hay servicios registrados para mostrar.\n")
+                                        else:
+                                            fecha_actual = datetime.datetime.now().strftime("%m_%d_%Y")
+                                            print("Reporte de todos los servicios ordenados por nombre:\n")
+                                            print(f"\n{'Clave':<10}| {'Nombre':<30}| {'Costo':<15}|")
+                                            print("-"*60)
+
+                                            for clave, nombre, costo in todos_los_servicios_por_nombre:
+                                                clave = str(clave)
+                                                clave = clave.ljust(10)
+                                                nombre = nombre.ljust(30)
+                                                costo = f'{costo:.2f}'.ljust(15)
+                                                print(f"{clave:<10}| {nombre:<30}| {costo:<15}|")
+
+                                            while True:
+                                                print("MENÚ\n[C]SV\n[E]xcel\n[R]egresar")
+                                                opcion = input("¿Desea exportar el reporte? (CSV/Excel/Regresar): ").strip().lower()
+
+                                                if opcion == "c":
+                                                    nombre_archivo = f"ReporteServiciosPorNombre_{fecha_actual}.csv"
+                                                    try:
+                                                        with open(nombre_archivo, 'w', newline='') as archivo_csv:
+                                                            escritor = csv.writer(archivo_csv)
+                                                            escritor.writerow(["Clave", "Nombre", "Costo"])
+                                                            for clave, nombre, costo in todos_los_servicios_por_nombre:
+                                                                escritor.writerow([clave, nombre, costo])
+                                                        print(f'\nSe han guardado los datos en {nombre_archivo}\n')
+                                                    except Exception as e:
+                                                        print(f'Error al guardar los datos en el archivo CSV: {e}')
+                                                    break
+                                                elif opcion == "e":
+                                                    nombre_archivo = f"ReporteServiciosPorNombre_{fecha_actual}.xlsx"
+                                                    libro = openpyxl.Workbook()
+                                                    hoja = libro.active
+                                                    hoja.title = "Servicios"
+
+                                                    hoja.append(["Clave", "Nombre", "Costo"])
+
+                                                    for clave, nombre, costo in todos_los_servicios_por_nombre:
+                                                        hoja.append([clave, nombre, costo])
+                                                    hoja.column_dimensions["A"].width = 10
+                                                    hoja.column_dimensions["B"].width = 40
+                                                    hoja.column_dimensions["C"].width = 20
+
+                                                    libro.save(nombre_archivo)
+
+                                                    print(f"\nReporte exportado a {nombre_archivo}\n")
+                                                    break
+                                                elif opcion == "r":
+                                                    break
+                                                else:
+                                                    print("Opción no válida. Ingrese 'CSV', 'Excel' o 'Regresar.'")
+                                except sqlite3.Error as e:
+                                    print(e)
+                                except Exception as ex:
+                                    print(f"Se produjo el siguiente error: {ex}")
+                            elif listado_servicio == "3":
+                                print("\nFuera del menú de listado de servicios.\n")
+                                break
+                            else:
+                                print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
+                            break
+                    elif menu_consulta_servivio == "4":
+                        print("\nFuera del menú de consultas y reportes.\n")
+                        break
+                    else:
+                        print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
+            elif menu_servicios == "3":
+                print("\nFuera del menú de servivios.\n")
+                break
+            else: 
+                print("OPCIÓN NO VALIDA. INTENTE NUEVAMENTE.")
+                
     elif menu_principal == "4":
         if input("SEGURO DESEA SALIR DEL PROGRAMA? (S/N o Enter para volver a menu principal):\n ").upper()=="S":
             print("Fin del programa.")
